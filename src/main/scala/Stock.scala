@@ -1,0 +1,1 @@
+case class Stock(symbol: String, price: Double)
