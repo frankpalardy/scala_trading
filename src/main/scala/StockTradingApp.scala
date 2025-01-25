@@ -1,50 +1,45 @@
 import org.apache.spark.sql.SparkSession
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 object StockTradingApp {
   def main(args: Array[String]): Unit = {
-    implicit val spark: SparkSession = SparkSession.builder
-      .appName("StockPriceApp")
-      .config("spark.master", "local")
-      .getOrCreate()
 
-    import spark.implicits._
-    val stockPrices = Seq(
-      StockPrice("AAPL", "2025-01-01", 150.0),
-      StockPrice("GOOGL", "2025-01-01", 2800.0)
-    )
-
-    DatabaseInitializer.createTableAndLoadData(stockPrices)
-
-    val df = StockPrice.toDF(stockPrices)
-    df.show()
   }
-  val portfolio = new Portfolio
+  implicit val spark: SparkSession = SparkSession.builder
+    .appName("StockPriceApp")
+    .config("spark.master", "local")
+    .getOrCreate()
 
-  val apple = Stock("AAPL", 150.0)
-  val google = Stock("GOOGL", 2800.0)
+  import spark.implicits._
+    // Function to generate dates
+  def generateDates(start: LocalDate, count: Int): List[String] = {
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    (0 until count).map(i => start.plusDays(i).format(formatter)).toList
+  }
+  // Generate more data for AAPL
+  val startDate = LocalDate.of(2024, 1, 1)
+  val dates = generateDates(startDate, 365)
+  val random = new scala.util.Random(42)
 
-  portfolio.buy(apple, 10)
-  portfolio.buy(google, 5)
-
-  println(s"Portfolio: ${portfolio.getPortfolio}")
-  println(s"Total Value: ${portfolio.getTotalValue}")
-
-  portfolio.sell(apple, 5)
-  println(s"Portfolio after selling 5 AAPL: ${portfolio.getPortfolio}")
-  println(s"Total Value after selling: ${portfolio.getTotalValue}")
-
-  // Update stock price
-  portfolio.updatePrice("AAPL", 160.0)
-  println(s"Portfolio after updating AAPL price: ${portfolio.getPortfolio}")
-  println(s"Total Value after updating price: ${portfolio.getTotalValue}")
-
-  // Get highest value stock
-  portfolio.getHighestValueStock.foreach { case (stock, quantity) =>
-    println(s"Highest value stock: ${stock.symbol} with value ${stock.price * quantity}")
+  val aaplPrices = dates.map { date =>
+    val basePrice = 150.0
+    val randomFactor = 0.98 + (random.nextDouble() * 0.04)
+    val price = basePrice * randomFactor
+    StockPrice("AAPL", date, math.round(price * 100.0) / 100.0)
   }
 
-  // Get lowest value stock
-  portfolio.getLowestValueStock.foreach { case (stock, quantity) =>
-    println(s"Lowest value stock: ${stock.symbol} with value ${stock.price * quantity}")
-  }
+  val stockPrices = aaplPrices ++ Seq(
+    StockPrice("GOOGL", "2025-01-01", 2800.0)
+  )
+
+  DatabaseInitializer.createTableAndLoadData(stockPrices)
+  val pred = new StockPredictor();
+  val model = pred.trainModel(stockPrices)
+
+  val df = StockPrice.toDF(stockPrices)
+  val prediction = pred.predict(model, "AAPL:","2025-02-01")
+  println(s"Predicted stock price for AAPL on 2025-02-01: $prediction")
+  //df.show()
+
 }
