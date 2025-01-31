@@ -23,7 +23,7 @@ object DatabaseInitializer {
         |CREATE TABLE IF NOT EXISTS stocks (
         |  symbol VARCHAR(10) NOT NULL,
         |  date DATE NOT NULL,
-        |  price DOUBLE PRECISION NOT NULL,
+        |  closePrice DOUBLE PRECISION NOT NULL,
         |  PRIMARY KEY (symbol, date)
         |);
       """.stripMargin
@@ -34,8 +34,8 @@ object DatabaseInitializer {
     data.foreach { stockPrice =>
       val insertSQL =
         s"""
-           |INSERT INTO stocks (symbol, date, price)
-           |VALUES ('${stockPrice.symbol}', '${stockPrice.date}', ${stockPrice.price})
+           |INSERT INTO stocks (symbol, date, closePrice)
+           |VALUES ('${stockPrice.symbol}', '${stockPrice.date}', ${stockPrice.closePrice})
            |ON CONFLICT (symbol, date) DO NOTHING;
          """.stripMargin
       statement.execute(insertSQL)

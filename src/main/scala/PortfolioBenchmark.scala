@@ -36,12 +36,12 @@ object PortfolioBenchmark {
 
     // Get highest value stock
     portfolio.getHighestValueStock.foreach { case (stock, quantity) =>
-      println(s"Highest value stock: ${stock.symbol} with value ${stock.price * quantity}")
+      println(s"Highest value stock: ${stock.symbol} with value ${stock.closePrice * quantity}")
     }
 
     // Get lowest value stock
     portfolio.getLowestValueStock.foreach { case (stock, quantity) =>
-      println(s"Lowest value stock: ${stock.symbol} with value ${stock.price * quantity}")
+      println(s"Lowest value stock: ${stock.symbol} with value ${stock.closePrice * quantity}")
     }
 
     println(s"Execution time: ${duration / 1e6} ms")

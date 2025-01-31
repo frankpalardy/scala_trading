@@ -2,7 +2,7 @@ import java.sql.{Connection, DriverManager, ResultSet, SQLException}
 import scala.concurrent.{Future, ExecutionContext}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-case class StockPrice(symbol: String, date: String, price: Double)
+case class StockPrice(symbol: String, date: String, closePrice: Double)
 
 import java.sql.{Connection, DriverManager}
 

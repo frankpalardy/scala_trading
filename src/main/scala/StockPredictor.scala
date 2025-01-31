@@ -32,7 +32,7 @@ class StockPredictor {
     val featuresDF = assembler.transform(dfIndexed)
 
     val lr = new LinearRegression()
-      .setLabelCol("price")
+      .setLabelCol("closePrice")
       .setFeaturesCol("features")
 
     val model = lr.fit(featuresDF)

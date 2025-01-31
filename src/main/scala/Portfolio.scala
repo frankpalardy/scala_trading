@@ -21,21 +21,21 @@ class Portfolio {
   def getPortfolio: Map[String, (Stock, Int)] = stocks.toMap
 
   def getTotalValue: Double = {
-    stocks.values.map { case (stock, quantity) => stock.price * quantity }.sum
+    stocks.values.map { case (stock, quantity) => stock.closePrice * quantity }.sum
   }
 
   def updatePrice(symbol: String, newPrice: Double): Unit = {
     stocks.updateWith(symbol) {
-      case Some((stock, quantity)) => Some((stock.copy(price = newPrice), quantity))
+      case Some((stock, quantity)) => Some((stock.copy(closePrice = newPrice), quantity))
       case None => None
     }
   }
 
   def getHighestValueStock: Option[(Stock, Int)] = {
-    stocks.values.maxByOption { case (stock, quantity) => stock.price * quantity }
+    stocks.values.maxByOption { case (stock, quantity) => stock.closePrice * quantity }
   }
 
   def getLowestValueStock: Option[(Stock, Int)] = {
-    stocks.values.minByOption { case (stock, quantity) => stock.price * quantity }
+    stocks.values.minByOption { case (stock, quantity) => stock.closePrice * quantity }
   }
 }
