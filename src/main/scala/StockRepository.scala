@@ -7,7 +7,7 @@ class StockRepository(implicit ec: ExecutionContext) {
   def getHistoricalPrices(symbol: String): Future[Seq[StockPrice]] = Future {
     val connection = DatabaseConfig.getConnection
     try {
-      val statement = connection.prepareStatement("SELECT symbol, date, price FROM stocks WHERE symbol = ?")
+      val statement = connection.prepareStatement("SELECT symbol, date, closePrice FROM stocks WHERE symbol = ?")
       statement.setString(1, symbol)
       val resultSet = statement.executeQuery()
       resultSetToStockPrices(resultSet)
@@ -25,7 +25,7 @@ class StockRepository(implicit ec: ExecutionContext) {
 
   private def resultSetToStockPrices(resultSet: ResultSet): Seq[StockPrice] = {
     Iterator.continually((resultSet.next(), resultSet)).takeWhile(_._1).map { case (_, rs) =>
-      StockPrice(rs.getString("symbol"), rs.getString("date"), rs.getDouble("price"))
+      StockPrice(rs.getString("symbol"), rs.getString("date"), rs.getDouble("closePrice"))
     }.toList
   }
 }
