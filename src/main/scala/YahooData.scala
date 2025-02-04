@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.IteratorHasAsScala
 
+
 object YahooData {
 
   // Removed unused import: import spark.implicits._
@@ -44,12 +45,13 @@ object YahooData {
     val stockPrices = new ListBuffer[StockPrice]()
 
     for ((timestamp, closePrice) <- timestamps.zip(closePrices)) {
-      val date = new java.util.Date(timestamp * 1000L)
-      val formattedDate = new java.text.SimpleDateFormat("yyyy-MM-dd").format(date)
-      stockPrices += StockPrice(symbol, formattedDate, closePrice)
+      if (closePrice > 0) {
+        val date = new java.util.Date(timestamp * 1000L)
+        val formattedDate = new java.text.SimpleDateFormat("yyyy-MM-dd").format(date)
+        stockPrices += StockPrice(symbol, formattedDate, closePrice)
+      }
     }
 
     stockPrices.toList
   }
-
 }
