@@ -31,7 +31,16 @@ object StockTradingApp {
       underlyingPrice = 598.0,
       strikePrice = 575.0,
       timeToExpiration = .126,
-      riskFreeRate = 4.54,
+      riskFreeRate = .0454,
+      isCall = false
+    )
+
+    val amerGreeks = AmericanOptionGreeks.calculateAmericanOptionGreeks(
+      marketPrice = 5.57,
+      underlyingPrice = 598.0,
+      strikePrice = 575.0,
+      timeToExpiration = .126,
+      riskFreeRate = .0454, // divided by 100
       isCall = false
     )
 
