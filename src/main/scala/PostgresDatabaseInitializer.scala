@@ -1,8 +1,20 @@
 import java.sql.{Connection, DriverManager, SQLException, Statement}
 
-object DatabaseInitializer {
+import scala.concurrent.{Future, ExecutionContext}
+
+object PostgresConfig {
+  val url = "jdbc:postgresql://localhost:5432/trades"
+  val user = "frank"
+  val password = "doodle"
+
+  def getConnection: Connection = {
+    DriverManager.getConnection(url, user, password)
+  }
+}
+
+object PostgresDatabaseInitializer {
   def createTableAndLoadData(data: Seq[StockPrice]): Unit = {
-    val connection = DatabaseConfig.getConnection
+    val connection = PostgresConfig.getConnection
     try {
       val statement = connection.createStatement()
       //createTable(statement)

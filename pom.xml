@@ -65,6 +65,16 @@
             <artifactId>postgresql</artifactId>
             <version>42.6.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.mongodb.scala</groupId>
+            <artifactId>mongo-scala-driver_2.12</artifactId>
+            <version>4.7.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.mongodb.scala</groupId>
+            <artifactId>mongo-scala-bson_2.12</artifactId>
+            <version>4.7.0</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.scala-lang.modules/scala-parallel-collections -->
         <dependency>
             <groupId>org.scala-lang.modules</groupId>
