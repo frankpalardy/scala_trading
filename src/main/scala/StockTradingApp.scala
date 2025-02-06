@@ -9,21 +9,21 @@ object StockTradingApp {
       .appName("StockPriceApp")
       .config("spark.master", "local")
       .getOrCreate()
-    implicit val stockRepository: StockRepository = new StockRepository()
+    implicit val stockRepository: PostgresRepository = new PostgresRepository()
     // Example usage
     val currentTime = System.currentTimeMillis() / 1000
     val oneMonthAgo = currentTime - (30 * 24 * 60 * 60)
-    val yahooData = YahooData.fetchYahooFinanceData("SPY250321P00575000", oneMonthAgo, currentTime)
+    val yahooData = YahooData.fetchYahooFinanceData("SPY", oneMonthAgo, currentTime)
 
-    // Use the fetched data for further processing
+    // SPY250321P00580000
 
-    DatabaseInitializer.createTableAndLoadData(yahooData)
+    MongoDatabaseInitializer.createTableAndLoadData(yahooData)
     val pred = new StockPredictor()
     val model = pred.trainModel(yahooData)
 
-    val df = StockPrice.toDF(yahooData)
-    val prediction = pred.predict(model, "SPY250321P00575000", "2025-02-05")
-    println(s"Predicted stock price for SPY250321P00575000 on 2025-02-05: $prediction")
+    val df = LongStockPrice.toDF(yahooData)
+    val prediction = pred.predict(model, "SPY", "2025-02-05")
+    println(s"Predicted stock price for SPY on 2025-02-05: $prediction")
     df.show()
 
     val greeks = OptionGreeks.calculateOptionGreeks(

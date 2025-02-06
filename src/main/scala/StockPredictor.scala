@@ -12,8 +12,8 @@ class StockPredictor {
 
   import spark.implicits._
 
-  def trainModel(data: Seq[StockPrice]): LinearRegressionModel = {
-    val df = StockPrice.toDF(data)
+  def trainModel(data: Seq[LongStockPrice]): LinearRegressionModel = {
+    val df = LongStockPrice.toDF(data)
 
     // Convert date to numeric format (Unix timestamp)
     val dfWithNumericDate = df.withColumn("dateNumeric",

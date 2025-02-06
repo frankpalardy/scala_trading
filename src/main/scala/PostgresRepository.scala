@@ -2,10 +2,10 @@ import java.sql.{Connection, ResultSet, SQLException}
 import scala.concurrent.{Future, ExecutionContext}
 import scala.util.{Failure, Success, Try}
 
-class StockRepository(implicit ec: ExecutionContext) {
+class PostgresRepository(implicit ec: ExecutionContext) {
 
   def getHistoricalPrices(symbol: String): Future[Seq[StockPrice]] = Future {
-    val connection = DatabaseConfig.getConnection
+    val connection = PostgresConfig.getConnection
     try {
       val statement = connection.prepareStatement("SELECT symbol, date, closePrice FROM stocks WHERE symbol = ?")
       statement.setString(1, symbol)
@@ -24,7 +24,7 @@ class StockRepository(implicit ec: ExecutionContext) {
   }
 
   def insertStockPrice(stockPrice: StockPrice): Future[Boolean] = Future {
-    val connection = DatabaseConfig.getConnection
+    val connection = PostgresConfig.getConnection
     try {
       val statement = connection.prepareStatement("INSERT INTO stocks (symbol, date, closePrice) VALUES (?, ?, ?)")
       statement.setString(1, stockPrice.symbol)
@@ -44,7 +44,7 @@ class StockRepository(implicit ec: ExecutionContext) {
   }
 
   def insertStockPrices(stockPrices: List[StockPrice]): Future[Boolean] = Future {
-    val connection = DatabaseConfig.getConnection
+    val connection = PostgresConfig.getConnection
     try {
       val statement = connection.prepareStatement("INSERT INTO stocks (symbol, date, closePrice) VALUES (?, ?, ?)")
       stockPrices.foreach { stockPrice =>
