@@ -96,6 +96,63 @@ object AmericanOptionGreeks {
     }
   }
 
+  def calculateAmericanOptionGreeksWithoutMarketPrice(
+                                                       underlyingPrice: Double,
+                                                       strikePrice: Double,
+                                                       timeToExpiration: Double,
+                                                       riskFreeRate: Double,
+                                                       volatility: Double,
+                                                       isCall: Boolean,
+                                                       steps: Int = 100
+                                                     ): AmericanOptionGreeks = {
+    val dt = timeToExpiration / steps
+    val u = exp(volatility * sqrt(dt))
+    val d = 1 / u
+    val p = (exp(riskFreeRate * dt) - d) / (u - d)
+
+    // Initialize the stock price tree
+    val stockTree = Array.ofDim[Double](steps + 1, steps + 1)
+    for (i <- 0 to steps) {
+      for (j <- 0 to i) {
+        stockTree(i)(j) = underlyingPrice * pow(u, j) * pow(d, i - j)
+      }
+    }
+
+    // Initialize the option value tree
+    val optionTree = Array.ofDim[Double](steps + 1, steps + 1)
+    for (j <- 0 to steps) {
+      optionTree(steps)(j) = math.max(0, if (isCall) stockTree(steps)(j) - strikePrice else strikePrice - stockTree(steps)(j))
+    }
+
+    // Backward induction
+    for (i <- steps - 1 to 0 by -1) {
+      for (j <- 0 to i) {
+        val exerciseValue = math.max(0, if (isCall) stockTree(i)(j) - strikePrice else strikePrice - stockTree(i)(j))
+        val continuationValue = exp(-riskFreeRate * dt) * (p * optionTree(i + 1)(j + 1) + (1 - p) * optionTree(i + 1)(j))
+        optionTree(i)(j) = math.max(exerciseValue, continuationValue)
+      }
+    }
+
+    // Calculate Greeks
+    val price = optionTree(0)(0)
+    val delta = (optionTree(1)(1) - optionTree(1)(0)) / (stockTree(1)(1) - stockTree(1)(0))
+    val gamma = ((optionTree(2)(2) - optionTree(2)(1)) / (stockTree(2)(2) - stockTree(2)(1)) -
+      (optionTree(2)(1) - optionTree(2)(0)) / (stockTree(2)(1) - stockTree(2)(0))) /
+      ((stockTree(1)(1) - stockTree(1)(0)) / 2)
+    val theta = (optionTree(1)(0) - price) / dt
+
+    // For Vega and Rho, we need to recalculate with a small change in volatility and interest rate
+    val dVol = 0.01
+    val dRate = 0.01
+    val priceWithHigherVol = calculateAmericanOptionPrice(underlyingPrice, strikePrice, timeToExpiration, riskFreeRate, volatility + dVol, isCall, steps)
+    val priceWithHigherRate = calculateAmericanOptionPrice(underlyingPrice, strikePrice, timeToExpiration, riskFreeRate + dRate, volatility, isCall, steps)
+
+    val vega = (priceWithHigherVol - price) / dVol
+    val rho = (priceWithHigherRate - price) / dRate
+
+    AmericanOptionGreeks(price, volatility, delta, gamma, theta, vega, rho)
+  }
+
   private def calculateAmericanOptionPrice(
                                             underlyingPrice: Double,
                                             strikePrice: Double,

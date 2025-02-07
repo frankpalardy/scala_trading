@@ -1,6 +1,6 @@
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-case class LongStockPrice(symbol: String, date: String, closePrice: Double, timestamp: Seq[Double], close: Seq[Double])
+case class LongStockPrice(symbol: String, date: String, closePrice: Double, timestamp: Seq[Long], close: Seq[Double])
 
 
 object LongStockPrice {

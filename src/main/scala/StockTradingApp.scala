@@ -12,8 +12,8 @@ object StockTradingApp {
     implicit val stockRepository: PostgresRepository = new PostgresRepository()
     // Example usage
     val currentTime = System.currentTimeMillis() / 1000
-    val oneMonthAgo = currentTime - (30 * 24 * 60 * 60)
-    val yahooData = YahooData.fetchYahooFinanceData("SPY", oneMonthAgo, currentTime)
+    val oneWeekAgo = currentTime - (7 * 24 * 60 * 60)
+    val yahooData = YahooData.fetchYahooFinanceData("SPY", oneWeekAgo, currentTime)
 
     // SPY250321P00580000
 
@@ -26,13 +26,23 @@ object StockTradingApp {
     println(s"Predicted stock price for SPY on 2025-02-05: $prediction")
     df.show()
 
-    val greeks = OptionGreeks.calculateOptionGreeks(
+    val eurogreeks = OptionGreeks.calculateOptionGreeks(
       marketPrice = 5.57,
       underlyingPrice = 598.0,
       strikePrice = 575.0,
       timeToExpiration = .126,
       riskFreeRate = .0454,
       isCall = false
+    )
+
+    val greeks = AmericanOptionGreeks.calculateAmericanOptionGreeksWithoutMarketPrice(
+
+      underlyingPrice = 598.0,
+      strikePrice = 575.0,
+      timeToExpiration = .126,
+      riskFreeRate = .0454,
+      isCall = false,
+      volatility = .184
     )
 
     val amerGreeks = AmericanOptionGreeks.calculateAmericanOptionGreeks(
@@ -50,6 +60,7 @@ object StockTradingApp {
     println(s"Theta: ${greeks.theta}")
     println(s"Vega: ${greeks.vega}")
     println(s"Rho: ${greeks.rho}")
+    println(s"price: ${greeks.price}")
 
   }
 }
