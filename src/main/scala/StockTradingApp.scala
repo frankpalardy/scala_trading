@@ -54,13 +54,33 @@ object StockTradingApp {
       isCall = false
     )
 
-    println(s"Implied Volatility: ${greeks.impliedVolatility}")
-    println(s"Delta: ${greeks.delta}")
-    println(s"Gamma: ${greeks.gamma}")
-    println(s"Theta: ${greeks.theta}")
-    println(s"Vega: ${greeks.vega}")
-    println(s"Rho: ${greeks.rho}")
-    println(s"price: ${greeks.price}")
+    // Usage example:
+    val impliedVol = OptionPriceCalculator.calculateAdjustedVolatility(
+      yahooData,      // Your L
+      vixPrice = 16.54,
+      strikePrice = 580.0,
+      timeToExpiration = 0.109,
+      isCall = false
+    )
+
+
+    // Usage example:
+    val theoreticalPrice = OptionPriceCalculator.calculateOptionPrice(
+      currentPrice = 600.77,
+      strikePrice = 580.0,
+      timeToExpiration = 0.11,
+      riskFreeRate = 0.0454,
+      impliedVol,
+      isCall = false
+    )
+
+      println(s"Implied Volatility: ${impliedVol}")
+    /*  println(s"Delta: ${greeks.delta}")
+      println(s"Gamma: ${greeks.gamma}")
+      println(s"Theta: ${greeks.theta}")
+      println(s"Vega: ${greeks.vega}")
+      println(s"Rho: ${greeks.rho}")*/
+    println(s"price: ${theoreticalPrice}")
 
   }
 }

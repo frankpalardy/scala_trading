@@ -35,8 +35,10 @@ object MongoDatabaseInitializer {
         "symbol" -> stockPrice.symbol,
         "date" -> stockPrice.date,
         "closePrice" -> stockPrice.closePrice,
-        "timestamp" -> stockPrice.timestamp,
-        "close" -> stockPrice.close      )
+        "timestamp" -> stockPrice.timestamps,
+        "lows" -> stockPrice.lows,
+        "highs" -> stockPrice.highs,
+        "close" -> stockPrice.prices      )
     }
     collection.insertMany(documents).toFuture().map(_ => ()).recover {
       case e: Exception => println(s"Error inserting documents: ${e.getMessage}")

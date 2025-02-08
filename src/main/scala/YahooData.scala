@@ -19,10 +19,6 @@ import scala.math.Fractional.Implicits.infixFractionalOps
 
 
 object YahooData {
-
-  // Removed unused import: import spark.implicits._
-
-  // Function to fetch historical stock data from Yahoo Finance
   def fetchYahooFinanceData(symbol: String, period1: Long, period2: Long): List[LongStockPrice] = {
     val encodedSymbol = URLEncoder.encode(symbol, StandardCharsets.UTF_8.toString)
     val url = s"https://query1.finance.yahoo.com/v8/finance/chart/$encodedSymbol?period1=$period1&period2=$period2&interval=1m"
@@ -44,20 +40,36 @@ object YahooData {
       val timestampSeq = chartResult.path("timestamp").elements().asScala.map(_.asLong()).toSeq
       val quote = chartResult.path("indicators").path("quote").get(0)
       val closePricesSeq = quote.path("close").elements().asScala.map(_.asDouble()).toSeq
+      val highPricesSeq = quote.path("high").elements().asScala.map(_.asDouble()).toSeq
+      val lowPricesSeq = quote.path("low").elements().asScala.map(_.asDouble()).toSeq
 
       // Group data by day
-      val groupedData = timestampSeq.zip(closePricesSeq).groupBy { case (timestamp, _) =>
-        val instant = Instant.ofEpochSecond(timestamp)
-        instant.atZone(ZoneId.of("UTC")).toLocalDate
-      }
+      val groupedData = timestampSeq.zip(closePricesSeq).zip(highPricesSeq).zip(lowPricesSeq)
+        .map { case (((ts, close), high), low) => (ts, close, high, low) }
+        .groupBy { case (timestamp, _, _, _) =>
+          val instant = Instant.ofEpochSecond(timestamp)
+          instant.atZone(ZoneId.of("UTC")).toLocalDate
+        }
 
       // Create LongStockPrice objects for each day
       groupedData.map { case (date, dayData) =>
-        val (dayTimestamps, dayClosePrices) = dayData.unzip
-        val formattedDate = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-        val closePrice = dayClosePrices.last // Use the last price of the day as the closing price
+        val dayTimestamps = dayData.map(_._1)
+        val dayClosePrices = dayData.map(_._2)
+        val dayHighPrices = dayData.map(_._3)
+        val dayLowPrices = dayData.map(_._4)
 
-        LongStockPrice(symbol, formattedDate, closePrice, dayTimestamps, dayClosePrices)
+        val formattedDate = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        val closePrice = dayClosePrices.last
+
+        LongStockPrice(
+          symbol = symbol,
+          date = formattedDate,
+          closePrice = closePrice,
+          timestamps = dayTimestamps,
+          prices = dayClosePrices,
+          highs = dayHighPrices,
+          lows = dayLowPrices
+        )
       }.toList.sortBy(_.date)
     } else {
       List.empty[LongStockPrice]
