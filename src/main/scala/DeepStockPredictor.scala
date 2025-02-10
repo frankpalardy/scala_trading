@@ -1,28 +1,33 @@
-import ai.djl.ndarray.{NDArray, NDManager, NDList}
+import ai.djl.ndarray.{NDArray, NDList, NDManager}
 import ai.djl.ndarray.types.{DataType, Shape}
-import ai.djl.training.{DefaultTrainingConfig, Trainer, ParameterStore}
+import ai.djl.training.{DefaultTrainingConfig, ParameterStore, Trainer}
 import ai.djl.training.dataset.ArrayDataset
 import ai.djl.training.loss.Loss
 import ai.djl.training.optimizer.Optimizer
 import ai.djl.training.listener.TrainingListener
-import ai.djl.nn.{Block, Parameter, AbstractBlock}
+import ai.djl.nn.{Block, Parameter, SequentialBlock}
 import ai.djl.Model
+import ai.djl.engine.Engine
+import ai.djl.training.tracker.Tracker
+
 import java.nio.file.Paths
 import ai.djl.util.PairList
 
 object DeepStockPredictor {
+
+  System.setProperty("ai.djl.default_engine", "PyTorch")
   val sequenceLength = 390 * 7  // Full week of trading minutes
   val numFeatures = 3      // price, high, low
   val hiddenSize = 50
   val batchSize = 32
   val epochs = 100
 
-  class LSTMModel extends AbstractBlock {
+  class LSTMModel extends SequentialBlock {
     private val lstm = ai.djl.nn.recurrent.LSTM
       .builder()
       .setNumLayers(2)
       .setStateSize(hiddenSize)
-      .setDropRate(0.2)
+      .optDropRate(0.2f)
       .build()
 
     private val dense = ai.djl.nn.core.Linear
@@ -30,37 +35,15 @@ object DeepStockPredictor {
       .setUnits(1)
       .build()
 
-    addChildBlock("lstm", lstm)
-    addChildBlock("dense", dense)
-
-    override def forwardInternal(
-                                  parameterStore: ParameterStore,
-                                  inputs: NDList,
-                                  training: Boolean,
-                                  params: PairList[String, Object]
-                                ): NDList = {
+    override def forward(parameterStore: ParameterStore, inputs: NDList, training: Boolean): NDList = {
       var current = inputs
       current = lstm.forward(parameterStore, current, training)
       current = dense.forward(parameterStore, current, training)
       current
     }
 
-    override def getOutputShapes(inputShapes: Array[Shape]): Array[Shape] = {
-      Array(new Shape(inputShapes(0).get(0), 1))
-    }
-
-    override def initializeChildBlocks(manager: NDManager, dataType: DataType, inputShapes: Shape*): Unit = {
-      lstm.initialize(manager, dataType, inputShapes: _*)
-      dense.initialize(manager, dataType, lstm.getOutputShapes(inputShapes.toArray): _*)
-    }
-
-    override protected def getDirectParameters(): java.util.Collection[Parameter] = {
-      new java.util.ArrayList[Parameter]()
-    }
-
-    override def getParameterShape(name: String, inputShapes: Array[Shape]): Shape = {
-      throw new UnsupportedOperationException("Not implemented")
-    }
+    add(lstm)
+    add(dense)
   }
 
   def prepareData(stockDataWeek: List[LongStockPrice]): (NDArray, NDArray) = {
@@ -93,12 +76,12 @@ object DeepStockPredictor {
       }.toList
 
       val features = manager.create(
-        sequences.map(_._1).toArray,
+        sequences.map(_._1).flatten.toArray,
         new Shape(sequences.length, sequenceLength, numFeatures)
       )
 
       val labels = manager.create(
-        sequences.map(_._2).toArray,
+        sequences.map(_._2).flatten.toArray,
         new Shape(sequences.length, 1)
       )
 
@@ -111,18 +94,23 @@ object DeepStockPredictor {
   }
 
   def train(stockDataWeek: List[LongStockPrice]): Model = {
-    val model = Model.newInstance("stockPredictor")
+    val engine = Engine.getInstance()
+    val model = Model.newInstance("stockPredictor", "PyTorch")
     model.setBlock(new LSTMModel())
 
     val config = new DefaultTrainingConfig(Loss.l2Loss())
-      .optOptimizer(Optimizer.adam().optLearningRate(0.001f).build())
-      .addTrainingListeners(TrainingListener.Defaults.logging())
+      .optOptimizer(
+        Optimizer.adam()
+          .optLearningRateTracker(Tracker.fixed(0.001f))
+          .build()
+      )
+      .addTrainingListeners(TrainingListener.Defaults.logging().head)
 
     val (features, labels) = prepareData(stockDataWeek)
     try {
       val dataset = new ArrayDataset.Builder()
         .setData(features)
-        .setLabels(labels)
+        .optLabels(labels)
         .setSampling(batchSize, true)
         .build()
 
@@ -133,10 +121,12 @@ object DeepStockPredictor {
         var epochLoss = 0f
         var batchCount = 0
 
-        for (batch <- dataset.getData(trainer.getManager())) {
+        val dataIter = dataset.getData(trainer.getManager()).iterator()
+        while (dataIter.hasNext()) {
+          val batch = dataIter.next()
           try {
-            val pred = trainer.forward(batch)
-            val loss = trainer.backward(pred)
+            val pred = trainer.forward(new NDList(batch.getData().head()))
+            val loss = trainer.getLoss().evaluate(pred, new NDList(batch.getLabels().head()))
             trainer.step()
             epochLoss += loss.getFloat()
             batchCount += 1
@@ -162,7 +152,7 @@ object DeepStockPredictor {
                stockDataWeek: List[LongStockPrice],
                targetTimestamp: Long
              ): Double = {
-    val manager = NDManager.newBaseManager()
+    val manager = NDManager.newBaseManager("PyTorch")
 
     try {
       val lastDay = stockDataWeek.maxBy(_.timestamps.max)
@@ -192,7 +182,7 @@ object DeepStockPredictor {
       )
 
       try {
-        val predictor = model.newPredictor()
+        val predictor = model.newPredictor(new ai.djl.translate.NoopTranslator())
         val prediction = predictor.predict(new NDList(input)).singletonOrThrow()
         prediction.getFloat() * (max - min) + min
       } finally {
@@ -203,4 +193,3 @@ object DeepStockPredictor {
     }
   }
 }
-
