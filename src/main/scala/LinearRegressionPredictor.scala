@@ -5,7 +5,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 
-class StockPredictor {
+class LinearRegressionPredictor {
   implicit val spark: SparkSession = SparkSession.builder
     .appName("StockPredictor")
     .master("local[*]")
@@ -13,8 +13,8 @@ class StockPredictor {
 
   import spark.implicits._
 
-  def trainModel(data: Seq[LongStockPrice]): LinearRegressionModel = {
-    val df = LongStockPrice.toDF(data)
+  def trainModel(data: Seq[AssetPrice]): LinearRegressionModel = {
+    val df = AssetPrice.toDF(data)
 
     // Convert date to numeric format (Unix timestamp)
     val dfWithNumericDate = df.withColumn("dateNumeric",
@@ -71,7 +71,7 @@ class StockPredictor {
       .setPredictionCol("prediction")
       .setMetricName("rmse")
     val rmse = evaluator.evaluate(model.transform(featuresDF))
-    println(s"Root Mean Squared Error (RMSE) on test data = $rmse")
+    println(s"LinearRegression (RMSE) on test data = $rmse")
 
     // Make the prediction
     val prediction = model.transform(featuresDF)

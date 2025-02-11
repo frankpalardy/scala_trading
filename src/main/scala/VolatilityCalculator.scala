@@ -1,5 +1,5 @@
 object VolatilityCalculator {
-  def calculateHistoricalVolatility(stockDataWeek: List[LongStockPrice]): Double = {
+  def calculateHistoricalVolatility(stockDataWeek: List[AssetPrice]): Double = {
     // Get daily closing prices from the week
     val dailyCloses = stockDataWeek.sortBy(_.date).map(_.closePrice)
 
@@ -19,7 +19,7 @@ object VolatilityCalculator {
     math.sqrt(variance * 252)
   }
 
-  def calculateParkinsonVolatility(stockDataWeek: List[LongStockPrice]): Double = {
+  def calculateParkinsonVolatility(stockDataWeek: List[AssetPrice]): Double = {
     // Calculate daily high-low volatility
     val dailyVolatilities = stockDataWeek.map { day =>
       val dayHigh = day.highs.max
@@ -34,7 +34,7 @@ object VolatilityCalculator {
   }
 
   def calculateImpliedVolatility(
-                                  stockDataWeek: List[LongStockPrice],
+                                  stockDataWeek: List[AssetPrice],
                                   optionPrice: Double,
                                   strikePrice: Double,
                                   timeToExpiration: Double,
@@ -75,7 +75,7 @@ object VolatilityCalculator {
   }
 
   def calculateImpliedVolatilityWithSkew(
-                                          stockDataWeek: List[LongStockPrice],
+                                          stockDataWeek: List[AssetPrice],
                                           optionPrice: Double,
                                           strikePrice: Double,
                                           timeToExpiration: Double,

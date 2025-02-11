@@ -2,7 +2,7 @@ import org.apache.spark.sql.SparkSession
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object StockTradingApp {
+object TradingApp {
   def main(args: Array[String]): Unit = {
 
     implicit val spark: SparkSession = SparkSession.builder
@@ -18,19 +18,19 @@ object StockTradingApp {
     val optionData = YahooData.fetchYahooFinanceData("SPY250321P00580000", oneWeekAgo, currentTime)
 
     MongoDatabaseInitializer.createTableAndLoadData(stockData)
-    val pred = new StockPredictor()
+    val pred = new LinearRegressionPredictor
     val model = pred.trainModel(stockData)
 // dl version
-    val dlmodel = DeepStockPredictor.train(stockData)  // First train and get the model
+    val dlmodel = LSTMPredictor.train(stockData)  // First train and get the model
     val targetTimestamp = stockData.last.timestamps.last
-    val dlprediction = DeepStockPredictor.predict(dlmodel, stockData, targetTimestamp)
+    val dlprediction = LSTMPredictor.predict(dlmodel, stockData, targetTimestamp)
     println(s"Predicted price: $dlprediction")
 
     // linear regression version
     val closingPriceIndex = stockData.head.prices.length - 1
-    val df = LongStockPrice.toDF(stockData)
-    val prediction = pred.predict(model, "SPY", "2025-02-07", closingPriceIndex)
-    println(s"Predicted stock price for SPY on 2025-02-07: $prediction")
+    val df = AssetPrice.toDF(stockData)
+    val prediction = pred.predict(model, "SPY", "2025-02-10", closingPriceIndex)
+    println(s"Predicted stock price for SPY on 2025-02-10: $prediction")
     df.show()
 
     val eurogreeks = OptionGreeks.calculateOptionGreeks(

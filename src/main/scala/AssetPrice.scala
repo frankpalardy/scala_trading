@@ -1,6 +1,6 @@
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-case class LongStockPrice(
+case class AssetPrice(
                            symbol: String,
                            date: String,
                            closePrice: Double,
@@ -10,8 +10,8 @@ case class LongStockPrice(
                            lows: Seq[Double]
                          )
 
-object LongStockPrice {
-  def toDF(data: Seq[LongStockPrice])(implicit spark: SparkSession): DataFrame = {
+object AssetPrice {
+  def toDF(data: Seq[AssetPrice])(implicit spark: SparkSession): DataFrame = {
     import spark.implicits._
     data.toDF()
   }

@@ -1,7 +1,7 @@
 object OptionPriceCalculator {
 
   def calculateAdjustedVolatility(
-                                   stockDataWeek: List[LongStockPrice],
+                                   stockDataWeek: List[AssetPrice],
                                    vixPrice: Double,  // Current VIX price from Yahoo
                                    strikePrice: Double,
                                    timeToExpiration: Double,
@@ -30,7 +30,7 @@ object OptionPriceCalculator {
     marketAdjustedVol * skewAdjustment
   }
 
-  private def calculateHistoricalVolatility(stockDataWeek: List[LongStockPrice]): Double = {
+  private def calculateHistoricalVolatility(stockDataWeek: List[AssetPrice]): Double = {
     val dailyCloses = stockDataWeek.sortBy(_.date).map(_.closePrice)
 
     val returns = dailyCloses.sliding(2)
