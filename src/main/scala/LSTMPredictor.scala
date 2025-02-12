@@ -16,7 +16,7 @@ import ai.djl.util.PairList
 
 object LSTMPredictor {
 
-  val sequenceLength = 380   // one day of trading minutes
+  val sequenceLength = 390    // one day of trading minutes
   val numFeatures = 3      // price, high, low
   val hiddenSize = 50
   val batchSize = 17
@@ -44,45 +44,45 @@ object LSTMPredictor {
       current = dense.forward(parameterStore, current, training)
       current
     }
-
     add(lstm)
     add(dense)
   }
 
   // Calculate sequence length based on actual data
-  def calculateSequenceLength(stockDataWeek: List[AssetPrice]): Int = {
-    val totalMinutes = stockDataWeek.map(_.timestamps.length).sum
-    println(s"Total minutes in data: $totalMinutes")
-    totalMinutes
+  def calculateDynamicSequenceLength(stockDataWeek: List[AssetPrice]): Int = {
+    val minDayLength = stockDataWeek.map(_.timestamps.length).min
+    println(s"Minimum day length: $minDayLength")
+    minDayLength - 1  // We use the last point as the target
   }
 
   def prepareData(stockDataWeek: List[AssetPrice]): (NDArray, NDArray) = {
     val manager = NDManager.newBaseManager()
-    val actualLength = calculateSequenceLength(stockDataWeek)
     try {
-      val sequences = stockDataWeek.flatMap { day =>
-        val data = day.timestamps.indices.map { i =>
+      // Combine all days into one continuous sequence
+      val allData = stockDataWeek.sortBy(_.date).flatMap { day =>
+        day.timestamps.indices.map { i =>
           (day.prices(i), day.highs(i), day.lows(i))
         }
+      }
 
-        data.sliding(sequenceLength + 1).map { window =>
-          val sequence = window.dropRight(1)
-          val target = window.last._1
+      // Get min/max for entire dataset for consistent normalization
+      val allValues = allData.flatMap { case (p, h, l) => List(p, h, l) }
+      val min = allValues.min
+      val max = allValues.max
+      // Create sequences using the full dataset with a step size
+      val sequences = allData.iterator.sliding(sequenceLength + 1, 10).map { window =>  // Step 10 minutes at a time
+        val sequence = window.dropRight(1)
+        val target = window.last._1
 
-          val allValues = sequence.flatMap { case (p, h, l) => List(p, h, l) }
-          val min = allValues.min
-          val max = allValues.max
-
-          val normalizedSeq = sequence.map { case (p, h, l) =>
-            Array(
-              ((p - min) / (max - min)).toFloat,
-              ((h - min) / (max - min)).toFloat,
-              ((l - min) / (max - min)).toFloat,
-            )
-          }
-
-          (normalizedSeq.flatten.toArray, Array((target - min) / (max - min)))
+        val features = sequence.map { case (p, h, l) =>
+          Array(
+            ((p - min) / (max - min)).toFloat,
+            ((h - min) / (max - min)).toFloat,
+            ((l - min) / (max - min)).toFloat
+          )
         }
+
+        (features.flatten.toArray, Array((target - min) / (max - min)).map(_.toFloat))
       }.toList
 
       println(s"Number of sequences: ${sequences.length}")
@@ -108,7 +108,7 @@ object LSTMPredictor {
   }
 
   def train(stockDataWeek: List[AssetPrice]): Model = {
-    val engine = Engine.getInstance()
+
     val model = Model.newInstance("stockPredictor")  // Let DJL choose the default engine
     model.setBlock(new LSTMModel())
 
