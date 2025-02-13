@@ -42,33 +42,36 @@ object YahooData {
       val closePricesSeq = quote.path("close").elements().asScala.map(_.asDouble()).toSeq
       val highPricesSeq = quote.path("high").elements().asScala.map(_.asDouble()).toSeq
       val lowPricesSeq = quote.path("low").elements().asScala.map(_.asDouble()).toSeq
+      val volSeq = quote.path("volume").elements().asScala.map(_.asInt()).toSeq
 
       // Group data by day
-      val groupedData = timestampSeq.zip(closePricesSeq).zip(highPricesSeq).zip(lowPricesSeq)
-        .map { case (((ts, close), high), low) => (ts, close, high, low) }
-        .groupBy { case (timestamp, _, _, _) =>
+      val groupedData = timestampSeq.zip(closePricesSeq).zip(highPricesSeq).zip(lowPricesSeq).zip(volSeq)
+        .map { case ((((ts, close), high), low), vol) => (ts, close, high, low, vol) }
+        .groupBy { case (timestamp, _, _, _, _) =>
           val instant = Instant.ofEpochSecond(timestamp)
           instant.atZone(ZoneId.of("UTC")).toLocalDate
         }
 
       // Create AssetPrice objects for each day
       groupedData.map { case (date, dayData) =>
-        val dayTimestamps = dayData.map(_._1)
-        val dayClosePrices = dayData.map(_._2)
-        val dayHighPrices = dayData.map(_._3)
-        val dayLowPrices = dayData.map(_._4)
+        val timestamps = dayData.map(_._1)
+        val closePrices = dayData.map(_._2)
+        val highPrices = dayData.map(_._3)
+        val lowPrices = dayData.map(_._4)
+        val volTime = dayData.map(_._5)
 
         val formattedDate = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-        val closePrice = dayClosePrices.last
+        val closePrice = closePrices.last
 
         AssetPrice(
           symbol = symbol,
           date = formattedDate,
           closePrice = closePrice,
-          timestamps = dayTimestamps,
-          prices = dayClosePrices,
-          highs = dayHighPrices,
-          lows = dayLowPrices
+          timestamps = timestamps,
+          prices = closePrices,
+          highs = highPrices,
+          lows = lowPrices,
+          volumes = volTime
         )
       }.toList.sortBy(_.date)
     } else {

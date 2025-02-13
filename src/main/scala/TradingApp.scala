@@ -17,14 +17,15 @@ object TradingApp {
     val stockData = YahooData.fetchYahooFinanceData("SPY", oneWeekAgo, currentTime)
     val optionData = YahooData.fetchYahooFinanceData("SPY250321P00580000", oneWeekAgo, currentTime)
 
-    MongoDatabaseInitializer.createTableAndLoadData(stockData)
+    MongoDatabaseInitializer.createTableAndLoadData(optionData)
     val pred = new LinearRegressionPredictor
     val model = pred.trainModel(stockData)
 // dl version
-    val dlmodel = LSTMPredictor.train(stockData)  // First train and get the model
-    val targetTimestamp = stockData.last.timestamps.last
-    val dlprediction = LSTMPredictor.predict(dlmodel, stockData, targetTimestamp)
-    println(s"Predicted price: $dlprediction")
+    val dlmodel = LSTMPredictor.train(optionData)  // First train and get the model
+    val targetTimestamp = optionData.last.timestamps.last
+    val (predictedHigh, predictedLow) = LSTMPredictor.predict(dlmodel, optionData)
+    println(s"Predicted high: $predictedHigh")
+    println(s"Predicted low: $predictedLow")
 
     // linear regression version
     val closingPriceIndex = stockData.head.prices.length - 1

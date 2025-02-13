@@ -7,8 +7,9 @@ case class AssetPrice(
                            timestamps: Seq[Long],
                            prices: Seq[Double],
                            highs: Seq[Double],
-                           lows: Seq[Double]
-                         )
+                           lows: Seq[Double],
+                           volumes: Seq[Int]
+                     )
 
 object AssetPrice {
   def toDF(data: Seq[AssetPrice])(implicit spark: SparkSession): DataFrame = {
