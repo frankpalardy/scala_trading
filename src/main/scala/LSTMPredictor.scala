@@ -4,12 +4,14 @@ import ai.djl.training.{DefaultTrainingConfig, GradientCollector, ParameterStore
 import ai.djl.training.dataset.ArrayDataset
 import ai.djl.training.loss.Loss
 import ai.djl.training.optimizer.Optimizer
-import ai.djl.training.listener.TrainingListener
+import ai.djl.training.listener.{EarlyStoppingListener, TrainingListener}
 import ai.djl.nn.{Block, Parameter, SequentialBlock}
 import ai.djl.Model
 import ai.djl.engine.Engine
 import ai.djl.ndarray.index.NDIndex
+import ai.djl.training.evaluator.Accuracy
 import ai.djl.training.tracker.Tracker
+import ai.djl.training.util.ProgressBar
 
 import java.nio.file.Paths
 import ai.djl.util.PairList
@@ -18,11 +20,32 @@ import java.time.{Instant, LocalDateTime, ZoneId}
 
 object LSTMPredictor {
 
-  val sequenceLength = 499    // one day of trading minutes
-  val numFeatures = 3      // price, high, low
+  val patience = 10
+  val minDelta = 0.001 // Minimum change in loss to be considered as improvement
+  val numFeatures = 3
   val hiddenSize = 50
-  val batchSize = 17
-  val epochs = 100
+  val batchSize = 20       // Changed to divide 500 evenly
+  val epochs =8
+
+  // Add class to hold normalization parameters
+  case class NormalizationParams(min: Double, max: Double)
+
+  def calculateSequenceLength(stockDataWeek: List[AssetPrice]): Int = {
+    val pointsPerDay = 100  // We're taking top 100 volume points per day
+    val tradingDays = stockDataWeek.count(day =>
+      day.timestamps.indices.exists(i => day.prices(i) > 0)
+    )
+    pointsPerDay * tradingDays
+  }
+
+  def getNormalizationParams(stockDataWeek: List[AssetPrice]): NormalizationParams = {
+    val allValues = stockDataWeek.flatMap { day =>
+      day.timestamps.indices
+        .filter(i => day.prices(i) > 0)
+        .flatMap(i => List(day.prices(i), day.highs(i), day.lows(i)))
+    }
+    NormalizationParams(allValues.min, allValues.max)
+  }
 
   class LSTMModel extends SequentialBlock {
     private val lstm = ai.djl.nn.recurrent.LSTM
@@ -49,24 +72,21 @@ object LSTMPredictor {
     add(dense)
   }
 
-  // Calculate sequence length based on actual data
-  def calculateDynamicSequenceLength(stockDataWeek: List[AssetPrice]): Int = {
-    val minDayLength = stockDataWeek.map(_.timestamps.length).min
-    println(s"Minimum day length: $minDayLength")
-    minDayLength - 1  // We use the last point as the target
-  }
 
-  def prepareData(stockDataWeek: List[AssetPrice]): (NDArray, NDArray) = {
+  def prepareData(stockDataWeek: List[AssetPrice]): (NDArray, NDArray, NormalizationParams) = {
     val manager = NDManager.newBaseManager()
     try {
-      // Print daily highs and lows before processing
+      // Print daily stats for debugging
       stockDataWeek.sortBy(_.date).foreach { day =>
         val validHighs = day.highs.filter(_ > 0)
         val validLows = day.lows.filter(_ > 0)
         if (validHighs.nonEmpty && validLows.nonEmpty) {
-          println(s"Day ${day.date}: High=${validHighs.max}, Low=${validLows.min}")
+          println(s"Day ${day.date}: High=${validHighs.max}, Low=${validLows.min}, price=${day.closePrice}")
         }
       }
+
+      val normParams = getNormalizationParams(stockDataWeek)
+      val sequenceLength = calculateSequenceLength(stockDataWeek)
       // First organize by day
       val dailyData = stockDataWeek.sortBy(_.date).map { day =>
         day.timestamps.indices
@@ -123,7 +143,7 @@ object LSTMPredictor {
       println(s"Valid data points after filtering: ${allData.length}")
       // Dynamic sequence length
       val actualLength = allData.length
-      val dynamicSequenceLength = actualLength - 1 // -1 to leave room for target
+      val dynamicSequenceLength = actualLength
 
       println(s"Using sequence length: $dynamicSequenceLength")
       // Get min/max for entire dataset for consistent normalization
@@ -131,7 +151,7 @@ object LSTMPredictor {
       val min = allValues.min
       val max = allValues.max
       // Create sequences using the full dataset with a step size
-      val sequences = allData.iterator.sliding(sequenceLength, 10).filter(_.size == dynamicSequenceLength) .map { window =>
+      val sequences = allData.iterator.sliding(sequenceLength, 10).map { window =>
         val sequence = window.take(dynamicSequenceLength)
         // get next day's high and low
         val targetHigh = stockDataWeek.last.highs.filter(_ > 0).max
@@ -168,7 +188,7 @@ object LSTMPredictor {
       println(s"Feature array length: ${sequences.map(_._1).flatten.length}")
       println(s"Label array length: ${sequences.map(_._2).length}")
 
-      (features, labels)
+      (features, labels, normParams)
     } catch {
       case e: Exception =>
         manager.close()
@@ -181,16 +201,21 @@ object LSTMPredictor {
     val model = Model.newInstance("stockPredictor")  // Let DJL choose the default engine
     model.setBlock(new LSTMModel())
 
+    val earlyStoppingListener = new CustomEarlyStoppingListener(5, 0.001f)
     val config = new DefaultTrainingConfig(Loss.l2Loss())
       .optOptimizer(
         Optimizer.adam()
           .optLearningRateTracker(Tracker.fixed(0.001f))
           .build()
       )
-      .addTrainingListeners(TrainingListener.Defaults.logging().head)
+      .addEvaluator(new Accuracy()) // Add evaluator for validation
+      .addTrainingListeners(
+        TrainingListener.Defaults.logging().head,
+        earlyStoppingListener
+      )
       .optDevices(Array(ai.djl.Device.cpu()))
 
-    val (features, labels) = prepareData(stockDataWeek)
+    val (features, labels, normParams) = prepareData(stockDataWeek)
     try {
       val dataset = new ArrayDataset.Builder()
         .setData(features)
@@ -201,7 +226,8 @@ object LSTMPredictor {
       val trainer = model.newTrainer(config)
       trainer.initialize(features.getShape())
 
-      for (epoch <- 1 to epochs) {
+      for (epoch <- 1 to epochs if !earlyStoppingListener.getShouldStop)
+          {
         var epochLoss = 0f
         var batchCount = 0
 
@@ -218,9 +244,7 @@ object LSTMPredictor {
             try {
               val pred = trainer.forward(new NDList(batch.getData().head()))
               println(s"Prediction shape: ${pred.head().getShape()}")
-
               loss = trainer.getLoss().evaluate(new NDList(pred.head()), new NDList(batch.getLabels().head()))
-
               // Compute gradients
               gc.backward(loss)
             } finally {
@@ -239,6 +263,10 @@ object LSTMPredictor {
         trainer.notifyListeners(listener => listener.onEpoch(trainer))
       }
 
+      // Save normalization params with model
+      model.setProperty("min", normParams.min.toString)
+      model.setProperty("max", normParams.max.toString)
+
       model.save(Paths.get("models"), "stockPredictor")
       model
     } finally {
@@ -247,69 +275,22 @@ object LSTMPredictor {
     }
   }
 
- /* def predict(
-               model: Model,
-               stockDataWeek: List[AssetPrice],
-               targetTimestamp: Long
-             ): Double = {
-    val manager = NDManager.newBaseManager()
+ def predict(
+              model: Model,
+              stockDataWeek: List[AssetPrice]
+            ): (Double, Double) = {
+   val manager = NDManager.newBaseManager()
+   val min = model.getProperty("min").toDouble
+   val max = model.getProperty("max").toDouble
+   try {
+     val sequenceLength = calculateSequenceLength(stockDataWeek)
 
-    try {
-      val lastDay = stockDataWeek.maxBy(_.timestamps.max)
-      val targetIndex = lastDay.timestamps.indexOf(targetTimestamp)
-
-      val sequence = lastDay.timestamps.indices
-        .slice(targetIndex - sequenceLength, targetIndex)
-        .map { i =>
-          Array(
-            lastDay.prices(i),
-            lastDay.highs(i),
-            lastDay.lows(i)
-          )
-        }
-
-      val allValues = sequence.flatten
-      val min = allValues.min
-      val max = allValues.max
-
-      val normalizedSeq = sequence.map { values =>
-        values.map(v => (v - min) / (max - min))
-      }
-
-      val input = manager.create(
-        normalizedSeq.flatten.map(_.toFloat).toArray,
-        new Shape(1, sequenceLength, numFeatures)
-      )
-
-      try {
-        val predictor = model.newPredictor(new ai.djl.translate.NoopTranslator())
-        val prediction = predictor.predict(new NDList(input)).singletonOrThrow()
-        prediction.getFloat() * (max - min) + min
-      } finally {
-        input.close()
-      }
-    } finally {
-      manager.close()
-    }
-  }
-*/
-  def predict(
-               model: Model,
-               stockDataWeek: List[AssetPrice]
-             ): (Double, Double) = {  // Return tuple of high and low
-    val manager = NDManager.newBaseManager()
-
-    try {
       // No need for targetTimestamp anymore since we're predicting next day
       val allData = stockDataWeek.sortBy(_.date).flatMap { day =>
         day.timestamps.indices.map { i =>
           (day.prices(i), day.highs(i), day.lows(i))
         }
       }
-
-      val allValues = allData.flatMap { case (p, h, l) => List(p, h, l) }
-      val min = allValues.min
-      val max = allValues.max
 
       // Take last sequence length worth of data
       val sequence = allData.takeRight(sequenceLength).map { case (p, h, l) =>
