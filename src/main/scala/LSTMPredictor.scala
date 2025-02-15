@@ -25,7 +25,7 @@ object LSTMPredictor {
   val numFeatures = 3
   val hiddenSize = 50
   val batchSize = 20       // Changed to divide 500 evenly
-  val epochs =8
+  val epochs =30
 
   // Add class to hold normalization parameters
   case class NormalizationParams(min: Double, max: Double)
@@ -275,42 +275,23 @@ object LSTMPredictor {
     }
   }
 
- def predict(
-              model: Model,
-              stockDataWeek: List[AssetPrice]
-            ): (Double, Double) = {
-   val manager = NDManager.newBaseManager()
-   val min = model.getProperty("min").toDouble
-   val max = model.getProperty("max").toDouble
-   try {
-     val sequenceLength = calculateSequenceLength(stockDataWeek)
+  def predict(
+               model: Model,
+               stockDataWeek: List[AssetPrice]
+             ): (Double, Double) = {
+    val manager = NDManager.newBaseManager()
 
-      // No need for targetTimestamp anymore since we're predicting next day
-      val allData = stockDataWeek.sortBy(_.date).flatMap { day =>
-        day.timestamps.indices.map { i =>
-          (day.prices(i), day.highs(i), day.lows(i))
-        }
-      }
+    try {
+      val (features, labels, normParam) = prepareData(stockDataWeek)  // Use existing prepareData
+      val min = normParam.min
+      val max = normParam.max
 
-      // Take last sequence length worth of data
-      val sequence = allData.takeRight(sequenceLength).map { case (p, h, l) =>
-        Array(
-          ((p - min) / (max - min)).toFloat,
-          ((h - min) / (max - min)).toFloat,
-          ((l - min) / (max - min)).toFloat
-        )
-      }
-
-      val input = manager.create(
-        sequence.flatten.toArray,
-        new Shape(1, sequenceLength, numFeatures)
-      )
+      val input = features  // features should already be properly formatted
 
       try {
         val predictor = model.newPredictor(new ai.djl.translate.NoopTranslator())
         val prediction = predictor.predict(new NDList(input)).singletonOrThrow()
 
-        // Get both predictions and denormalize
         val predictions = prediction.toFloatArray
         val predictedHigh = predictions(0) * (max - min) + min
         val predictedLow = predictions(1) * (max - min) + min
