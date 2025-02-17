@@ -1,3 +1,6 @@
+import java.time.temporal.ChronoUnit
+import java.time.{Instant, LocalDate, ZoneId}
+
 object OptionPriceCalculator {
 
   def calculateAdjustedVolatility(
@@ -79,5 +82,47 @@ object OptionPriceCalculator {
     val y = 1.0 - (((((a5*t + a4)*t) + a3)*t + a2)*t + a1)*t*math.exp(-z*z)
 
     0.5*(1.0 + sign*y)
+  }
+  def calculateFutureOptionPrice(
+                                  currentStockPrice: Double,
+                                  currentOptionPrice: Double,
+                                  strikePrice: Double,
+                                  currentDate: LocalDate,
+                                  expirationDate: LocalDate,
+                                  predictedStockPrice: Double,
+                                  predictedDate: LocalDate,
+                                  riskFreeRate: Double,
+                                  isCall: Boolean,
+                                  stockDataWeek: List[AssetPrice],
+                                  vixPrice: Double
+                                ): Double = {
+    // Calculate current time to expiration
+    val currentTimeToExpiration = ChronoUnit.DAYS.between(currentDate, expirationDate) / 365.0
+
+    // Calculate predicted time to expiration
+    val predictedTimeToExpiration = ChronoUnit.DAYS.between(predictedDate, expirationDate) / 365.0
+
+    // Calculate current adjusted volatility
+    val currentVolatility = calculateAdjustedVolatility(
+      stockDataWeek,
+      vixPrice,
+      strikePrice,
+      currentTimeToExpiration,
+      isCall
+    )
+
+    // Estimate future volatility (this is a simplification, you might want to use a more sophisticated model)
+    val volatilityChange = math.abs(predictedStockPrice / currentStockPrice - 1) * 0.5 // Adjust this factor as needed
+    val predictedVolatility = currentVolatility * (1 + volatilityChange)
+
+    // Calculate the predicted option price
+    calculateOptionPrice(
+      predictedStockPrice,
+      strikePrice,
+      predictedTimeToExpiration,
+      riskFreeRate,
+      predictedVolatility,
+      isCall
+    )
   }
 }

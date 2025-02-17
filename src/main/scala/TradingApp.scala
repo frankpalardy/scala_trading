@@ -20,7 +20,7 @@ object TradingApp {
     MongoDatabaseInitializer.createTableAndLoadData(optionData)
     val pred = new LinearRegressionPredictor
     val model = pred.trainModel(stockData)
-// dl version
+/* dl version
     val dlmodel = LSTMPredictor.train(optionData)  // First train and get the model
     val targetTimestamp = optionData.last.timestamps.last
     val (predictedHigh, predictedLow) = LSTMPredictor.predict(dlmodel, optionData)
@@ -32,7 +32,7 @@ object TradingApp {
     val df = AssetPrice.toDF(stockData)
     val prediction = pred.predict(model, "SPY", "2025-02-10", closingPriceIndex)
     println(s"Predicted stock price for SPY on 2025-02-10: $prediction")
-    df.show()
+    df.show() */
 
     val eurogreeks = OptionGreeks.calculateOptionGreeks(
       marketPrice = 5.57,
@@ -43,7 +43,7 @@ object TradingApp {
       isCall = false
     )
 
-    val greeks = AmericanOptionGreeks.calculateAmericanOptionGreeksWithoutMarketPrice(
+   /* val greeks = AmericanOptionGreeks.calculateAmericanOptionGreeksWithoutMarketPrice(
       underlyingPrice = 598.0,
       strikePrice = 575.0,
       timeToExpiration = .126,
@@ -59,6 +59,14 @@ object TradingApp {
       timeToExpiration = .126,
       riskFreeRate = .0454, // divided by 100
       isCall = false
+    )*/
+
+    val futureVIX = VolatilityCalculator.estimateFutureVIX(
+      currentStockData = stockData,
+      futureStockPrice = 500.0, // Your predicted future stock price
+      futureDateString = "2025-3-15", // The date for which you're predicting
+      vixData.last.closePrice, // Current VIX from Yahoo
+      riskFreeRate = .0454, // divided by 100
     )
 
     val impliedVol = OptionPriceCalculator.calculateAdjustedVolatility(
@@ -70,11 +78,11 @@ object TradingApp {
     )
 
     val theoreticalPrice = OptionPriceCalculator.calculateOptionPrice(
-      currentPrice = 600.77,
+      currentPrice = 500,
       strikePrice = 580.0,
-      timeToExpiration = 0.11,
+      timeToExpiration = 0.07,
       riskFreeRate = 0.0454,
-      impliedVol,
+      futureVIX,
       isCall = false
     )
 
@@ -84,6 +92,7 @@ object TradingApp {
       println(s"Theta: ${greeks.theta}")
       println(s"Vega: ${greeks.vega}")
       println(s"Rho: ${greeks.rho}")*/
+    println(s"futureVIX: ${futureVIX}")
     println(s"price: ${theoreticalPrice}")
 
   }

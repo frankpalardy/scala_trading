@@ -74,6 +74,50 @@ object VolatilityCalculator {
     newtonRaphson(initialVol)
   }
 
+  def estimateFutureVIX(
+                         currentStockData: List[AssetPrice],
+                         futureStockPrice: Double,
+                         futureDateString: String,
+                         currentVIX: Double,
+                         riskFreeRate: Double
+                       ): Double = {
+    val dateFormat = new java.text.SimpleDateFormat("yyyy-MM-dd")
+    val futureDate = dateFormat.parse(futureDateString)
+    val currentDate = dateFormat.parse(currentStockData.maxBy(_.date).date)
+
+    val currentPrice = currentStockData.maxBy(_.date).closePrice
+    val timeToFuture = (futureDate.getTime - currentDate.getTime) / (1000.0 * 60 * 60 * 24 * 365)
+
+    // Calculate the magnitude of the price move
+    val priceReturn = math.log(futureStockPrice / currentPrice)
+
+    // Calculate the speed of the move (return per unit of time)
+    val returnSpeed = priceReturn / timeToFuture
+
+    // Calculate realized volatility from current data
+    val realizedVol = calculateRealizedVolatility(currentStockData)
+
+    // Adjust implied volatility based on price move
+    val impliedMove = math.abs(priceReturn) / math.sqrt(timeToFuture)
+
+    // VIX is implied vol * 100
+    val adjustedVIX = impliedMove * 100
+
+    adjustedVIX
+  }
+
+  def calculateRealizedVolatility(stockData: List[AssetPrice]): Double = {
+    val returns = stockData.sortBy(_.date)
+      .sliding(2)
+      .map { case Seq(prev, curr) =>
+        math.log(curr.closePrice / prev.closePrice)
+      }
+      .toList
+
+    val meanReturn = returns.sum / returns.length
+    val variance = returns.map(r => math.pow(r - meanReturn, 2)).sum / returns.length
+    math.sqrt(variance * 252)  // Annualized
+  }
   def calculateImpliedVolatilityWithSkew(
                                           stockDataWeek: List[AssetPrice],
                                           optionPrice: Double,
