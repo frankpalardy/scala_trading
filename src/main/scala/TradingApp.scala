@@ -34,11 +34,12 @@ object TradingApp {
     println(s"Predicted stock price for SPY on 2025-02-10: $prediction")
     df.show() */
 
+
     val eurogreeks = OptionGreeks.calculateOptionGreeks(
       marketPrice = 5.57,
       underlyingPrice = 598.0,
       strikePrice = 575.0,
-      timeToExpiration = .126,
+      BusinessDayCalculator.calculateTimeToExpiration("2025-03-15"),
       riskFreeRate = .0454,
       isCall = false
     )
@@ -64,23 +65,23 @@ object TradingApp {
     val futureVIX = VolatilityCalculator.estimateFutureVIX(
       currentStockData = stockData,
       futureStockPrice = 500.0, // Your predicted future stock price
-      futureDateString = "2025-3-15", // The date for which you're predicting
-      vixData.last.closePrice, // Current VIX from Yahoo
+      futureDateString = "2025-3-21", // The date for which you're predicting
+      vixData.sortBy(_.date)(Ordering[String].reverse).find(_.closePrice > 0).map(_.closePrice).getOrElse(throw new Exception("No valid VIX data found")),
       riskFreeRate = .0454, // divided by 100
     )
 
     val impliedVol = OptionPriceCalculator.calculateAdjustedVolatility(
       stockData,      // Your L
-      vixData.last.closePrice,
+      vixData.sortBy(_.date)(Ordering[String].reverse).find(_.closePrice > 0).map(_.closePrice).getOrElse(throw new Exception("No valid VIX data found")),
       strikePrice = 580.0,
-      timeToExpiration = 0.109,
+      BusinessDayCalculator.calculateTimeToExpiration("2025-03-21"),
       isCall = false
     )
 
     val theoreticalPrice = OptionPriceCalculator.calculateOptionPrice(
       currentPrice = 500,
       strikePrice = 580.0,
-      timeToExpiration = 0.07,
+      BusinessDayCalculator.calculateTimeToExpiration("2025-03-15"),
       riskFreeRate = 0.0454,
       futureVIX,
       isCall = false

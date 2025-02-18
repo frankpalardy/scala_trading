@@ -16,7 +16,7 @@ object OptionPriceCalculator {
     val historicalVol = calculateHistoricalVolatility(stockDataWeek)
 
     // VIX is quoted in percentage points, convert to decimal
-    val vixVol = vixPrice / 100.0
+    val vixVol = vixPrice
 
     // Use VIX as a scaling factor for our historical volatility
     val scalingFactor = vixVol / historicalVol
