@@ -20,7 +20,7 @@ object MongoConfig {
 }
 
 object MongoDatabaseInitializer {
-  def createTableAndLoadData(data: Seq[AssetPrice]): Future[Unit] = {
+  def createTableAndLoadData(data: Seq[Asset]): Future[Unit] = {
     MongoConfig.getCollection.flatMap { collection =>
       insertData(collection, data)
     }.recover {
@@ -29,7 +29,7 @@ object MongoDatabaseInitializer {
     }
   }
 
-  private def insertData(collection: MongoCollection[Document], data: Seq[AssetPrice]): Future[Unit] = {
+  private def insertData(collection: MongoCollection[Document], data: Seq[Asset]): Future[Unit] = {
     val documents = data.map { stockPrice =>
       Document(
         "symbol" -> stockPrice.symbol,

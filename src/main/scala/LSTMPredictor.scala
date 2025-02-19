@@ -30,7 +30,7 @@ object LSTMPredictor {
   // Add class to hold normalization parameters
   case class NormalizationParams(min: Double, max: Double)
 
-  def calculateSequenceLength(stockDataWeek: List[AssetPrice]): Int = {
+  def calculateSequenceLength(stockDataWeek: List[Asset]): Int = {
     val pointsPerDay = 100  // We're taking top 100 volume points per day
     val tradingDays = stockDataWeek.count(day =>
       day.timestamps.indices.exists(i => day.prices(i) > 0)
@@ -38,7 +38,7 @@ object LSTMPredictor {
     pointsPerDay * tradingDays
   }
 
-  def getNormalizationParams(stockDataWeek: List[AssetPrice]): NormalizationParams = {
+  def getNormalizationParams(stockDataWeek: List[Asset]): NormalizationParams = {
     val allValues = stockDataWeek.flatMap { day =>
       day.timestamps.indices
         .filter(i => day.prices(i) > 0)
@@ -73,7 +73,7 @@ object LSTMPredictor {
   }
 
 
-  def prepareData(stockDataWeek: List[AssetPrice]): (NDArray, NDArray, NormalizationParams) = {
+  def prepareData(stockDataWeek: List[Asset]): (NDArray, NDArray, NormalizationParams) = {
     val manager = NDManager.newBaseManager()
     try {
       // Print daily stats for debugging
@@ -196,7 +196,7 @@ object LSTMPredictor {
     }
   }
 
-  def train(stockDataWeek: List[AssetPrice]): Model = {
+  def train(stockDataWeek: List[Asset]): Model = {
 
     val model = Model.newInstance("stockPredictor")  // Let DJL choose the default engine
     model.setBlock(new LSTMModel())
@@ -277,7 +277,7 @@ object LSTMPredictor {
 
   def predict(
                model: Model,
-               stockDataWeek: List[AssetPrice]
+               stockDataWeek: List[Asset]
              ): (Double, Double) = {
     val manager = NDManager.newBaseManager()
 

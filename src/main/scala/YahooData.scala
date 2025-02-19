@@ -19,7 +19,7 @@ import scala.math.Fractional.Implicits.infixFractionalOps
 
 
 object YahooData {
-  def fetchYahooFinanceData(symbol: String, period1: Long, period2: Long): List[AssetPrice] = {
+  def fetchYahooFinanceData(symbol: String, period1: Long, period2: Long): List[Asset] = {
     val encodedSymbol = URLEncoder.encode(symbol, StandardCharsets.UTF_8.toString)
     val url = s"https://query1.finance.yahoo.com/v8/finance/chart/$encodedSymbol?period1=$period1&period2=$period2&interval=1m"
 
@@ -63,7 +63,7 @@ object YahooData {
         val formattedDate = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
         val closePrice = closePrices.last
 
-        AssetPrice(
+        Asset(
           symbol = symbol,
           date = formattedDate,
           closePrice = closePrice,
@@ -75,7 +75,7 @@ object YahooData {
         )
       }.toList.sortBy(_.date)
     } else {
-      List.empty[AssetPrice]
+      List.empty[Asset]
     }
   }
 }

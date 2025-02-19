@@ -1,5 +1,5 @@
 object VolatilityCalculator {
-  def calculateHistoricalVolatility(stockDataWeek: List[AssetPrice]): Double = {
+  def calculateHistoricalVolatility(stockDataWeek: List[Asset]): Double = {
     // Get daily closing prices from the week
     val dailyCloses = stockDataWeek.sortBy(_.date).map(_.closePrice)
 
@@ -19,7 +19,7 @@ object VolatilityCalculator {
     math.sqrt(variance * 252)
   }
 
-  def calculateParkinsonVolatility(stockDataWeek: List[AssetPrice]): Double = {
+  def calculateParkinsonVolatility(stockDataWeek: List[Asset]): Double = {
     // Calculate daily high-low volatility
     val dailyVolatilities = stockDataWeek.map { day =>
       val dayHigh = day.highs.max
@@ -34,7 +34,7 @@ object VolatilityCalculator {
   }
 
   def calculateImpliedVolatility(
-                                  stockDataWeek: List[AssetPrice],
+                                  stockDataWeek: List[Asset],
                                   optionPrice: Double,
                                   strikePrice: Double,
                                   timeToExpiration: Double,
@@ -75,7 +75,7 @@ object VolatilityCalculator {
   }
 
   def estimateFutureVIX(
-                         currentStockData: List[AssetPrice],
+                         currentStockData: List[Asset],
                          futureStockPrice: Double,
                          futureDateString: String,
                          currentVIX: Double,
@@ -106,7 +106,7 @@ object VolatilityCalculator {
     adjustedVIX
   }
 
-  def calculateRealizedVolatility(stockData: List[AssetPrice]): Double = {
+  def calculateRealizedVolatility(stockData: List[Asset]): Double = {
     val returns = stockData.sortBy(_.date)
       .sliding(2)
       .map { case Seq(prev, curr) =>
@@ -119,7 +119,7 @@ object VolatilityCalculator {
     math.sqrt(variance * 252)  // Annualized
   }
   def calculateImpliedVolatilityWithSkew(
-                                          stockDataWeek: List[AssetPrice],
+                                          stockDataWeek: List[Asset],
                                           optionPrice: Double,
                                           strikePrice: Double,
                                           timeToExpiration: Double,

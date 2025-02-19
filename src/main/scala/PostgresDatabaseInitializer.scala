@@ -13,7 +13,7 @@ object PostgresConfig {
 }
 
 object PostgresDatabaseInitializer {
-  def createTableAndLoadData(data: Seq[StockPrice]): Unit = {
+  def createTableAndLoadData(data: Seq[Asset]): Unit = {
     val connection = PostgresConfig.getConnection
     try {
       val statement = connection.createStatement()
@@ -42,7 +42,7 @@ object PostgresDatabaseInitializer {
     statement.execute(createTableSQL)
   }
 
-  private def insertData(statement: Statement, data: Seq[StockPrice]): Unit = {
+  private def insertData(statement: Statement, data: Seq[Asset]): Unit = {
     data.foreach { stockPrice =>
       val insertSQL =
         s"""

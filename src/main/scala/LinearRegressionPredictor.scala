@@ -13,8 +13,8 @@ class LinearRegressionPredictor {
 
   import spark.implicits._
 
-  def trainModel(data: Seq[AssetPrice]): LinearRegressionModel = {
-    val df = AssetPrice.toDF(data)
+  def trainModel(data: Seq[Asset]): LinearRegressionModel = {
+    val df = Asset.toDF(data)
 
     // Convert date to numeric format (Unix timestamp)
     val dfWithNumericDate = df.withColumn("dateNumeric",

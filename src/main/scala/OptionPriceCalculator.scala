@@ -4,7 +4,7 @@ import java.time.{Instant, LocalDate, ZoneId}
 object OptionPriceCalculator {
 
   def calculateAdjustedVolatility(
-                                   stockDataWeek: List[AssetPrice],
+                                   stockDataWeek: List[Asset],
                                    vixPrice: Double,  // Current VIX price from Yahoo
                                    strikePrice: Double,
                                    timeToExpiration: Double,
@@ -33,7 +33,7 @@ object OptionPriceCalculator {
     marketAdjustedVol * skewAdjustment
   }
 
-  private def calculateHistoricalVolatility(stockDataWeek: List[AssetPrice]): Double = {
+  private def calculateHistoricalVolatility(stockDataWeek: List[Asset]): Double = {
     val dailyCloses = stockDataWeek.sortBy(_.date).map(_.closePrice)
 
     val returns = dailyCloses.sliding(2)
@@ -93,7 +93,7 @@ object OptionPriceCalculator {
                                   predictedDate: LocalDate,
                                   riskFreeRate: Double,
                                   isCall: Boolean,
-                                  stockDataWeek: List[AssetPrice],
+                                  stockDataWeek: List[Asset],
                                   vixPrice: Double
                                 ): Double = {
     // Calculate current time to expiration

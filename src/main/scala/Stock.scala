@@ -1,1 +1,0 @@
-case class Stock(symbol: String, closePrice: Double)
