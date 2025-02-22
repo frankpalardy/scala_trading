@@ -2,7 +2,7 @@ import org.apache.spark.sql.SparkSession
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object TradingApp {
+object Platform {
   def main(args: Array[String]): Unit = {
 
     implicit val spark: SparkSession = SparkSession.builder
