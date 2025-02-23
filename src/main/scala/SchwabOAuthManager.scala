@@ -1,147 +1,139 @@
-import com.pangility.schwab.api.client.oauth2.{
-  SchwabTokenHandler,
-  SchwabOauth2Controller,
-  RefreshTokenException
-}
-import java.time.Instant
+import com.pangility.schwab.api.client.oauth2.{SchwabAccount, SchwabOauth2Controller}
+import org.springframework.ui.Model
+import org.springframework.web.servlet.mvc.support.RedirectAttributes
+import org.springframework.web.servlet.view.RedirectView
+import reactor.core.publisher.Mono
+
+import java.util
+import java.util.function.{Consumer => JConsumer}
 import scala.concurrent.{Future, Promise}
-import scala.util.{Try, Success, Failure}
 
-class SchwabOAuthManager(
-                          clientId: String,
-                          clientSecret: String,
-                          redirectUri: String
-                        ) {
-  // Create OAuth2 Controller
-  private val oauth2Controller = new SchwabOauth2Controller(
-    clientId,
-    clientSecret,
-    redirectUri
-  )
 
-  // Token Handler
-  private val tokenHandler = new SchwabTokenHandler()
+class SchwabOAuthManager {
+  private val oauth2Controller = new SchwabOauth2Controller()
 
-  // Generate Authorization URL
-  def generateAuthorizationUrl(): String = {
-    oauth2Controller.getAuthorizationUrl()
+
+  def handleAuthorization(
+                           redirectAttributes: RedirectAttributes,
+                           userId: String,
+                           callback: String
+                         ): RedirectView = {
+    oauth2Controller.authorize(redirectAttributes,userId, callback)
   }
-
-  // Handle Authorization
-  def handleAuthorization(authorizationCode: String): Future[String] = {
-    val promise = Promise[String]()
-
-    Try {
-      // Exchange authorization code for access token
-      val accessToken = oauth2Controller.exchangeAuthorizationCode(authorizationCode)
-      promise.success(accessToken)
-    } match {
-      case Success(_) =>
-        promise.future
-      case Failure(ex) =>
-        promise.failure(new Exception(s"Authorization failed: ${ex.getMessage}"))
-        promise.future
-    }
-
-    promise.future
-  }
-
-  // Refresh Token
-  def refreshAccessToken(refreshToken: String): Future[String] = {
-    val promise = Promise[String]()
-
-    Try {
-      val newAccessToken = tokenHandler.refreshAccessToken(refreshToken)
-      promise.success(newAccessToken)
-    } match {
-      case Success(_) =>
-        promise.future
-      case Failure(ex: RefreshTokenException) =>
-        promise.failure(new Exception(s"Token refresh failed: ${ex.getMessage}"))
-        promise.future
-      case Failure(ex) =>
-        promise.failure(new Exception(s"Unexpected error: ${ex.getMessage}"))
-        promise.future
-    }
-
-    promise.future
-  }
-
-  // Validate Token
-  def isTokenValid(token: String): Boolean = {
+  // Refresh Access Token with Account
+  def refreshAccessTokenWithAccount(
+                                     account: SchwabAccount
+                                   ): Option[Mono[SchwabAccount]] = {
     try {
-      tokenHandler.validateAccessToken(token)
-      true
+      val monoAccount = oauth2Controller.refreshAccessToken(account)
+      Some(monoAccount)
     } catch {
-      case _: Exception => false
+      case e: Exception =>
+        println(s"Token refresh with account failed: ${e.getMessage}")
+        None
     }
   }
 
-  // Revoke Token
-  def revokeToken(token: String): Future[Boolean] = {
-    val promise = Promise[Boolean]()
-
-    Try {
-      oauth2Controller.revokeToken(token)
-      promise.success(true)
-    } match {
-      case Success(_) =>
-        promise.future
-      case Failure(ex) =>
-        promise.failure(new Exception(s"Token revocation failed: ${ex.getMessage}"))
-        promise.future
+  // Refresh Access Token with UserID
+  def refreshAccessTokenWithUserId(
+                                    userId: String
+                                  ): Option[Mono[SchwabAccount]] = {
+    try {
+      val monoAccount = oauth2Controller.refreshAccessToken(userId)
+      Some(monoAccount)
+    } catch {
+      case e: Exception =>
+        println(s"Token refresh with userId failed: ${e.getMessage}")
+        None
     }
+  }
 
-    promise.future
+  // Get Access Token with UserID
+  def getAccessToken(
+                      userId: String
+                    ): Option[Mono[SchwabAccount]] = {
+    try {
+      val monoAccount = oauth2Controller.getAccessToken(userId)
+      Some(monoAccount)
+    } catch {
+      case e: Exception =>
+        println(s"Get access token failed: ${e.getMessage}")
+        None
+    }
   }
 }
 
 // Usage Example
-object SchwabOAuthApp extends App {
-  val oauthManager = new SchwabOAuthManager(
-    clientId = sys.env.getOrElse("SCHWAB_CLIENT_ID", ""),
-    clientSecret = sys.env.getOrElse("SCHWAB_CLIENT_SECRET", ""),
-    redirectUri = sys.env.getOrElse("SCHWAB_REDIRECT_URI", "")
-  )
+object OAuthReactiveApp extends App {
+  val oauthManager = new SchwabOAuthManager()
+  val userId = "user123"
+  val account = new SchwabAccount()
 
-  // OAuth Flow Example
-  def performOAuthFlow(): Unit = {
-    // Generate Authorization URL
-    val authUrl = oauthManager.generateAuthorizationUrl()
-    println(s"Please visit this URL and authorize: $authUrl")
+  // Example of handling Mono
+  def handleTokenRefresh(): Unit = {
+    // Refresh with Account
+    oauthManager.refreshAccessTokenWithAccount(account).foreach { monoAccount =>
+      monoAccount.subscribe(
+        new JConsumer[SchwabAccount] {
+          def accept(account: SchwabAccount): Unit = {
+            println(s"Refreshed Account: ${account.getUserId}")
+          }
+        },
+        new JConsumer[Throwable] {
+          def accept(error: Throwable): Unit = {
+            println(s"Error: ${error.getMessage}")
+          }
+        }
+      )
+    }
 
-    // After getting authorization code
-    val authorizationCode = "your_authorization_code"
-
-    val authFuture = oauthManager.handleAuthorization(authorizationCode)
-
-    authFuture.foreach { accessToken =>
-      println(s"Access Token: $accessToken")
-
-      // Validate token
-      if (oauthManager.isTokenValid(accessToken)) {
-        println("Token is valid")
-      }
+    // Refresh with UserID
+    oauthManager.refreshAccessTokenWithUserId(userId).foreach { monoAccount =>
+      monoAccount.subscribe(
+        new JConsumer[SchwabAccount] {
+          def accept(account: SchwabAccount): Unit = {
+            println(s"Refreshed Account User ID: ${account.getUserId}")
+          }
+        },
+        new JConsumer[Throwable] {
+          def accept(error: Throwable): Unit = {
+            println(s"Error refreshing account: ${error.getMessage}")
+          }
+        }
+      )
     }
   }
-}
 
-// Akka Actor Integration
-import akka.actor.typed.Behavior
-import akka.actor.typed.scaladsl.Behaviors
+  // You'll need to create RedirectAttributes
+  val redirectAttributes = new RedirectAttributes() {
+    override def addAttribute(attributeName: String, attributeValue: Any): RedirectAttributes = ???
 
-object OAuthActor {
-  sealed trait OAuthCommand
-  case class Authorize(code: String) extends OAuthCommand
-  case class RefreshToken(token: String) extends OAuthCommand
+    override def addAttribute(attributeValue: Any): RedirectAttributes = ???
 
-  def apply(oauthManager: SchwabOAuthManager): Behavior[OAuthCommand] =
-    Behaviors.receiveMessage {
-      case Authorize(code) =>
-        oauthManager.handleAuthorization(code)
-        Behaviors.same
-      case RefreshToken(token) =>
-        oauthManager.refreshAccessToken(token)
-        Behaviors.same
-    }
+    override def addAllAttributes(attributeValues: util.Collection[_]): RedirectAttributes = ???
+
+    override def mergeAttributes(attributes: util.Map[String, _]): RedirectAttributes = ???
+
+    override def addFlashAttribute(attributeName: String, attributeValue: Any): RedirectAttributes = ???
+
+    override def addFlashAttribute(attributeValue: Any): RedirectAttributes = ???
+
+    override def getFlashAttributes: util.Map[String, _] = ???
+
+    override def addAllAttributes(attributes: util.Map[String, _]): Model = ???
+
+    override def containsAttribute(attributeName: String): Boolean = ???
+
+    override def getAttribute(attributeName: String): AnyRef = ???
+
+    override def asMap(): util.Map[String, AnyRef] = ???
+  }
+
+  val redirectView = oauthManager.handleAuthorization(
+    userId = "your_user_id",
+    callback = "your_callback_url",
+    redirectAttributes = redirectAttributes
+  )
+  // Run the example
+  handleTokenRefresh()
 }
