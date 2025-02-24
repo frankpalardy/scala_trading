@@ -1,4 +1,5 @@
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+
 import scala.collection.mutable
 
 object AkkaTrading {
@@ -62,7 +63,7 @@ class AkkaTradingActor extends Actor {
 }
 
 // Usage example
-object AkkaTradingExample extends App {
+class AkkaTradingExample extends App {
   private val system = ActorSystem("TradingSystem")
   private val tradingActor: ActorRef = system.actorOf(AkkaTrading.props, "tradingActor")
 
